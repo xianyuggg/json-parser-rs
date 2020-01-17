@@ -1,0 +1,12 @@
+[package]
+name = "json-rs"
+version = "0.1.0"
+authors = ["GuXianyu <guxianyu@bytedance.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = { path = "./src/common"}
+json_value = { path = "./src/json_value"}
+typed-arena = "2.0.1"
