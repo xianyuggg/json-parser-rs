@@ -13,14 +13,14 @@ use common::USIZEWrapper;
 fn main() -> Result<(), Error>{
     let mut file = File::open("./data/test1.json")?;
     let mut contents = String::new();
-    file.read_to_string(contents.borrow_mut())?;
+    let len = file.read_to_string(contents.borrow_mut())?;
     let bytes_ref = contents.as_bytes();
-    let idx = USIZEWrapper::new(0).trim_whitespace(bytes_ref);
+    let mut idx = USIZEWrapper::new(0);
+    let idx_ref = idx.borrow_mut().trim_whitespace(bytes_ref);
 
-    parse_json_entry( bytes_ref, idx)?;
+    println!("=================================\n File length {} : \n{}", len, contents);
 
+    parse_json_entry(bytes_ref, idx_ref)?;
 
-    println!("=================================\n{}", contents);
     Ok(())
-
 }
