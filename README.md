@@ -16,6 +16,8 @@ A trivial project used to practice Rust trait and module system.
 
 + Return `Result<JsonValue, Error> `for each function, which can be used to handle some errors
 
++ Use `Cargo run --features "dbg" "mul-dbg"` to test debug features
+
 + ...
 
 **TODO :**
@@ -26,6 +28,5 @@ A trivial project used to practice Rust trait and module system.
   + Lifetime specifier
   + Use typed_arena to allocate Json value
   + ...
-
 
 

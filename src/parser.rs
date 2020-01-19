@@ -1,22 +1,26 @@
 use common::SYNTAX_ERROR;
+use common::abc;
 use common::USIZEWrapper;
 use std::io::{Error, ErrorKind};
 use json_value::JsonValue;
 use std::ops::Deref;
+use std::borrow::BorrowMut;
+
 
 
 // whitespace has been trailed
-pub fn parse_json_entry(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<(), Error>{
+pub fn parse_json_entry(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error>{
 
     let obj = match bytes[**idx] as char {
         '{' => {
-            println!("Start parsing a object!");
+
+            abc!("Start parsing a object!");
             let mut top_object = JsonValue::Object(Default::default());
             parse_inside_object(&mut top_object, bytes, idx.go_ahead(bytes))?;
             idx.trim_whitespace(bytes);
             match bytes[**idx] as char {
                 '}' => {
-                    println!("Parsing complete!");
+                    abc!("Parsing complete!");
                     top_object
                 }
                 _ => {
@@ -24,12 +28,27 @@ pub fn parse_json_entry(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<(), Erro
                 }
             }
         }
+        '[' => {
+            let mut vec = vec![];
+            parse_array(bytes, idx.go_ahead(bytes), vec.borrow_mut());
+            idx.trim_whitespace(bytes);
+            let top_array = JsonValue::Array(vec);
+            match bytes[**idx] as char{
+                ']' => {
+                    abc!("Parsing complete!");
+                    top_array
+                }
+                _ => {
+                    return SYNTAX_ERROR!("SYNTAX ERR!");
+                }
+            }
+
+        }
         _ => {
             return SYNTAX_ERROR!("SYNTAX ERR!");
         }
     };
-    println!("\n=================================\nParse result:\n{}", obj);
-    return Ok(());
+    return Ok(obj);
 }
 
 
@@ -48,7 +67,7 @@ fn parse_inside_object(parent: & mut JsonValue, bytes: &[u8], idx: &mut USIZEWra
             ParseObjectStatus::ParsingString => {
                 match bytes[**idx] as char {
                     '"' => {
-                        println!("Start parsing a string");
+                        abc!("Start parsing a string");
                         let res = parse_string(bytes, idx.go_ahead(bytes))?;
                         if let JsonValue::String(key) = res{
                             idx.trim_whitespace(bytes);
@@ -63,7 +82,7 @@ fn parse_inside_object(parent: & mut JsonValue, bytes: &[u8], idx: &mut USIZEWra
             ParseObjectStatus::ParsingColon(key) => {
                 match bytes[**idx] as char {
                     ':' => {
-                        println!("Start parsing a colon");
+                        abc!("Start parsing a colon");
                         idx.go_ahead(bytes).trim_whitespace(bytes);
                         status = ParseObjectStatus::ParsingValue(key);
                     }
@@ -89,7 +108,7 @@ fn parse_inside_object(parent: & mut JsonValue, bytes: &[u8], idx: &mut USIZEWra
                         status = ParseObjectStatus::ParsingString;
                     }
                     '}' => {
-                        println!("Detect }}");
+                        abc!("Detect }}");
                         idx.go_ahead(bytes);
                         return Ok(());
                     } // It will be only useful when encounter } and } is not the end of the file
@@ -116,7 +135,7 @@ fn parse_value(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error>
             Ok(JsonValue::Array(vec))
         }
         '{' => {
-            println!("Start parsing object of value");
+            abc!("Start parsing object of value");
             let mut object = JsonValue::Object(Default::default());
             parse_inside_object(&mut object, bytes, idx.go_ahead(bytes))?;
             Ok(object)
@@ -142,10 +161,10 @@ fn parse_value(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error>
 }
 
 fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error> {
-    println!("Start parsing number!");
+    abc!("Start parsing number!");
     // TODO : A Naive number parser
     let mut vec = vec![];
-    while !idx.is_end(bytes) & ! bytes[**idx].is_ascii_whitespace() {
+    while !idx.is_end(bytes) & ! bytes[**idx].is_ascii_whitespace() & ( bytes[**idx].is_ascii_digit() || bytes[**idx] as char == 'e'){
         match bytes[**idx] as char{
             _ => {
                 vec.push(bytes[**idx] as char);
@@ -157,7 +176,7 @@ fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
 }
 
 fn parse_array(bytes: &[u8], idx: &mut USIZEWrapper, vec: &mut Vec<JsonValue>) -> Result<(), Error> {
-    println!("Start parsing array!");
+    abc!("Start parsing array!");
     while !idx.is_end(bytes) {
         idx.trim_whitespace(bytes);
         match bytes[**idx] as char{
@@ -165,7 +184,7 @@ fn parse_array(bytes: &[u8], idx: &mut USIZEWrapper, vec: &mut Vec<JsonValue>) -
                 vec.push(parse_string(bytes, idx.go_ahead(bytes))?);
             }
             '{' => {
-                println!("Start parsing a object inside a array");
+                abc!("Start parsing a object inside a array");
                 let mut obj = JsonValue::Object(Default::default());
                 parse_inside_object(&mut obj ,bytes, idx.go_ahead(bytes))?;
                 vec.push(obj);
@@ -174,7 +193,7 @@ fn parse_array(bytes: &[u8], idx: &mut USIZEWrapper, vec: &mut Vec<JsonValue>) -
                 idx.go_ahead(bytes);
             }
             ']' => {
-                println!("Vec generate complete!");
+                abc!("Vec generate complete!");
                 idx.go_ahead(bytes);
                 return Ok(());
             }
@@ -192,7 +211,7 @@ fn parse_string(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
     while !idx.is_end(bytes){
         match bytes[**idx] as char{
             '"' => {
-                println!("Parsing string complete!");
+                abc!("Parsing string complete!");
                 idx.go_ahead(bytes);
                 return Ok( JsonValue::String(vec.into_iter().collect()));
             }

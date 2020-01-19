@@ -1,3 +1,5 @@
 
 /target/
 **/*.rs.bk
+src/common/target/
+src/.DS_Store
