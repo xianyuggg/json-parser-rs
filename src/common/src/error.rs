@@ -28,12 +28,4 @@ macro_rules! mul_dbg {
         println!( $($i),*);
     }
 }
-#[macro_export]
-#[cfg(not(feature = "mul-dbg"))]
-macro_rules! mul_dbg {
-    () => {};
-    ( $($i : expr),* ) => {
-
-    }
-}
 

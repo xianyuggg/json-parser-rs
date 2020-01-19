@@ -3,7 +3,6 @@ use common::abc;
 use common::USIZEWrapper;
 use std::io::{Error, ErrorKind};
 use json_value::JsonValue;
-use std::ops::Deref;
 use std::borrow::BorrowMut;
 use json_value::Number;
 
@@ -29,7 +28,7 @@ pub fn parse_json_entry(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValu
         }
         '[' => {
             let mut vec = vec![];
-            parse_array(bytes, idx.go_ahead(bytes), vec.borrow_mut());
+            parse_array(bytes, idx.go_ahead(bytes), vec.borrow_mut())?;
             idx.trim_whitespace(bytes);
             let top_array = JsonValue::Array(vec);
             match bytes[**idx] as char{
@@ -168,24 +167,30 @@ fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
         FloatDigit,
         ExponentialDigit
     }
+    let is_effect_end = | c: char| {
+        return if c == '}' || c == ']' || c == ',' || c.is_ascii_whitespace(){
+            true
+        } else {
+            false
+        }
+    };
 
     let mut status = ParsingNumberStatus::FirstDigit;
-    let mut number = 0 as f64;
+    let mut cur_val = 0 as f64;
     let is_negative = if bytes[**idx] as char == '-' { idx.go_ahead(bytes); true } else { false };
-
-    while (bytes[**idx] as char != '.') & bytes[**idx].is_ascii_digit() {
+    while bytes[**idx].is_ascii_digit() {
         match status{
             ParsingNumberStatus::FirstDigit => {
                 if bytes[**idx] - '0' as u8 == 0 {
                     break;
                 }else{
-                    number = number + bytes[**idx] as f64 - '0' as u8 as f64;
+                    cur_val = cur_val + bytes[**idx] as f64 - '0' as u8 as f64;
                 }
                 idx.go_ahead(bytes);
                 status = ParsingNumberStatus::IntDigit;
             },
             ParsingNumberStatus::IntDigit => {
-                number = number * 10 as f64 + bytes[**idx] as f64 - '0' as u8 as f64;
+                cur_val = cur_val * 10 as f64 + bytes[**idx] as f64 - '0' as u8 as f64;
                 idx.go_ahead(bytes);
             },
             _ => {
@@ -199,11 +204,11 @@ fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
             idx.go_ahead(bytes);
         }
         c => {
-            if c.is_ascii_whitespace() || c == '.' || c == ']' || c == ','{
-                let number = if is_negative { -number }else{ number };
-                return Ok(JsonValue::Number(Number::Int(number as isize)));
-            }else {
-                return SYNTAX_ERROR!("NUMBER-INT-ERROR");
+            return if is_effect_end(c) {
+                let number = if is_negative { -cur_val } else { cur_val };
+                Ok(JsonValue::Number(Number::Int(number as isize)))
+            } else {
+                SYNTAX_ERROR!("NUMBER-INT-ERROR")
             }
         }
     }
@@ -215,11 +220,10 @@ fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
         for _ in 0..depth{
             tmp = tmp / 10 as f64;
         }
-        number = number + tmp;
+        cur_val += tmp;
         depth += 1;
         idx.go_ahead(bytes);
     }
-
 
 
     match bytes[**idx] as char {
@@ -228,11 +232,11 @@ fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
             idx.go_ahead(bytes);
         }
         c => {
-            if c.is_ascii_whitespace() || c == '.' || c == ']' || c == ','{
-                let number = if is_negative { -number }else{ number };
-                return Ok(JsonValue::Number(Number::Float(number)));
-            }else {
-                return SYNTAX_ERROR!("NUMBER-FLOAT-ERROR");
+            return if !is_effect_end(c) {
+                SYNTAX_ERROR!("NUMBER-FLOAT-ERROR")
+            } else {
+                let number = if is_negative { -cur_val } else { cur_val };
+                Ok(JsonValue::Number(Number::Float(number)))
             }
         }
     }
@@ -259,28 +263,24 @@ fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
 
     if is_expo_negative {
         for _ in 0..expo_number {
-            number = number / 10 as f64;
+            cur_val = cur_val / 10 as f64;
         }
     }else {
         for _ in 0..expo_number {
-            number = number * 10 as f64;
+            cur_val = cur_val * 10 as f64;
         }
     }
 
     return match bytes[**idx] as char {
         c => {
-            if c.is_ascii_whitespace() || c == '.' || c == ']' || c == ',' {
-                let number = if is_negative { -number } else { number };
-                Ok(JsonValue::Number(Number::Expo(number)))
-            } else {
+            if !is_effect_end(c) {
                 SYNTAX_ERROR!("NUMBER-EXPO-ERROR")
+            } else {
+                let number = if is_negative { -cur_val } else { cur_val };
+                Ok(JsonValue::Number(Number::Expo(number)))
             }
         }
     };
-
-    unreachable!()
-
-
 }
 
 fn parse_array(bytes: &[u8], idx: &mut USIZEWrapper, vec: &mut Vec<JsonValue>) -> Result<(), Error> {
