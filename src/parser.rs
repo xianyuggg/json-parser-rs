@@ -30,17 +30,15 @@ pub fn parse_json_entry(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValu
             let mut vec = vec![];
             parse_array(bytes, idx.go_ahead(bytes), vec.borrow_mut())?;
             idx.trim_whitespace(bytes);
-            let top_array = JsonValue::Array(vec);
             match bytes[**idx] as char{
                 ']' => {
                     abc!("Parsing complete!");
-                    top_array
+                    JsonValue::Array(vec)
                 }
                 _ => {
                     return SYNTAX_ERROR!("SYNTAX ERR!");
                 }
             }
-
         }
         _ => {
             return SYNTAX_ERROR!("SYNTAX ERR!");
@@ -150,7 +148,7 @@ fn parse_value(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error>
             idx.go_ahead_by_times(bytes, 4);
             Ok(JsonValue::Null)
         }
-        _ => { // number parsing not support yet
+        _ => {
             let res = parse_number(bytes, idx)?;
             Ok(res)
         }
@@ -240,7 +238,6 @@ fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
             }
         }
     }
-
     // Parsing exponential parts
     let mut is_expo_negative = false;
     if bytes[**idx] as char == '+' || bytes[**idx] as char == '-' {
