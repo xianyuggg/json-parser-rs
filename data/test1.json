@@ -1,7 +1,5 @@
 {
-  "sites":[
-  {"name":"Runoob", "url":"www.runoob.com"},
-  {"name":"Google", "url":"www.google.com"},
-  {"name":"Taobao", "url":"www.taobao.com"}
-  ]
+  "number1" : -1.111111e-03,
+  "number2" : 1.1111,
+  "number3" : 111111111111111
 }

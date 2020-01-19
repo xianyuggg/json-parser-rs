@@ -5,7 +5,7 @@ use std::io::{Error, ErrorKind};
 use json_value::JsonValue;
 use std::ops::Deref;
 use std::borrow::BorrowMut;
-
+use json_value::Number;
 
 
 // whitespace has been trailed
@@ -13,7 +13,6 @@ pub fn parse_json_entry(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValu
 
     let obj = match bytes[**idx] as char {
         '{' => {
-
             abc!("Start parsing a object!");
             let mut top_object = JsonValue::Object(Default::default());
             parse_inside_object(&mut top_object, bytes, idx.go_ahead(bytes))?;
@@ -101,7 +100,6 @@ fn parse_inside_object(parent: & mut JsonValue, bytes: &[u8], idx: &mut USIZEWra
                 status = ParseObjectStatus::ParsingComma;
             },
             ParseObjectStatus::ParsingComma => {
-
                 match bytes[**idx] as char {
                     ',' => {
                         idx.go_ahead(bytes).trim_whitespace(bytes);
@@ -153,7 +151,7 @@ fn parse_value(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error>
             idx.go_ahead_by_times(bytes, 4);
             Ok(JsonValue::Null)
         }
-        _ => {
+        _ => { // number parsing not support yet
             let res = parse_number(bytes, idx)?;
             Ok(res)
         }
@@ -162,17 +160,127 @@ fn parse_value(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error>
 
 fn parse_number(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error> {
     abc!("Start parsing number!");
-    // TODO : A Naive number parser
-    let mut vec = vec![];
-    while !idx.is_end(bytes) & ! bytes[**idx].is_ascii_whitespace() & ( bytes[**idx].is_ascii_digit() || bytes[**idx] as char == 'e'){
-        match bytes[**idx] as char{
-            _ => {
-                vec.push(bytes[**idx] as char);
+
+
+    enum ParsingNumberStatus {
+        FirstDigit,
+        IntDigit,
+        FloatDigit,
+        ExponentialDigit
+    }
+
+    let mut status = ParsingNumberStatus::FirstDigit;
+    let mut number = 0 as f64;
+    let is_negative = if bytes[**idx] as char == '-' { idx.go_ahead(bytes); true } else { false };
+
+    while (bytes[**idx] as char != '.') & bytes[**idx].is_ascii_digit() {
+        match status{
+            ParsingNumberStatus::FirstDigit => {
+                if bytes[**idx] - '0' as u8 == 0 {
+                    break;
+                }else{
+                    number = number + bytes[**idx] as f64 - '0' as u8 as f64;
+                }
                 idx.go_ahead(bytes);
+                status = ParsingNumberStatus::IntDigit;
+            },
+            ParsingNumberStatus::IntDigit => {
+                number = number * 10 as f64 + bytes[**idx] as f64 - '0' as u8 as f64;
+                idx.go_ahead(bytes);
+            },
+            _ => {
+                unreachable!()
             }
         }
     }
-    Ok(JsonValue::Number(vec.iter().collect()))
+    match bytes[**idx] as char {
+        '.' => {
+            status = ParsingNumberStatus::FloatDigit;
+            idx.go_ahead(bytes);
+        }
+        c => {
+            if c.is_ascii_whitespace() || c == '.' || c == ']' || c == ','{
+                let number = if is_negative { -number }else{ number };
+                return Ok(JsonValue::Number(Number::Int(number as isize)));
+            }else {
+                return SYNTAX_ERROR!("NUMBER-INT-ERROR");
+            }
+        }
+    }
+
+    // Parsing float parts
+    let mut depth = 1;
+    while bytes[**idx].is_ascii_digit() {
+        let mut tmp = bytes[**idx] as f64-'0' as u8 as f64;
+        for _ in 0..depth{
+            tmp = tmp / 10 as f64;
+        }
+        number = number + tmp;
+        depth += 1;
+        idx.go_ahead(bytes);
+    }
+
+
+
+    match bytes[**idx] as char {
+        'e' | 'E' => {
+            status = ParsingNumberStatus::ExponentialDigit;
+            idx.go_ahead(bytes);
+        }
+        c => {
+            if c.is_ascii_whitespace() || c == '.' || c == ']' || c == ','{
+                let number = if is_negative { -number }else{ number };
+                return Ok(JsonValue::Number(Number::Float(number)));
+            }else {
+                return SYNTAX_ERROR!("NUMBER-FLOAT-ERROR");
+            }
+        }
+    }
+
+    // Parsing exponential parts
+    let mut is_expo_negative = false;
+    if bytes[**idx] as char == '+' || bytes[**idx] as char == '-' {
+        if bytes[**idx] as char == '-' {
+            is_expo_negative = true;
+        }
+        idx.go_ahead(bytes);
+    }
+    let mut expo_number = 0 as usize;
+    let mut is_first_expo_digits = true;
+    while bytes[**idx].is_ascii_digit() {
+        let tmp = bytes[**idx] as usize-'0' as usize;
+        if tmp == 0 && is_first_expo_digits{
+        } else {
+            is_first_expo_digits = false;
+            expo_number += expo_number * 10 + tmp;
+        }
+        idx.go_ahead(bytes);
+    }
+
+    if is_expo_negative {
+        for _ in 0..expo_number {
+            number = number / 10 as f64;
+        }
+    }else {
+        for _ in 0..expo_number {
+            number = number * 10 as f64;
+        }
+    }
+
+    return match bytes[**idx] as char {
+        c => {
+            if c.is_ascii_whitespace() || c == '.' || c == ']' || c == ',' {
+                let number = if is_negative { -number } else { number };
+                Ok(JsonValue::Number(Number::Expo(number)))
+            } else {
+                SYNTAX_ERROR!("NUMBER-EXPO-ERROR")
+            }
+        }
+    };
+
+    unreachable!()
+
+
 }
 
 fn parse_array(bytes: &[u8], idx: &mut USIZEWrapper, vec: &mut Vec<JsonValue>) -> Result<(), Error> {
@@ -213,7 +321,8 @@ fn parse_string(bytes: &[u8], idx: &mut USIZEWrapper) -> Result<JsonValue, Error
             '"' => {
                 abc!("Parsing string complete!");
                 idx.go_ahead(bytes);
-                return Ok( JsonValue::String(vec.into_iter().collect()));
+                let tmp = vec.into_iter().collect();
+                return Ok( JsonValue::String(tmp));
             }
             _ => {
                 vec.push(bytes[**idx] as char);

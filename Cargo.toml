@@ -11,6 +11,7 @@ common = { path = "./src/common"}
 json_value = { path = "./src/json_value"}
 typed-arena = "2.0.1"
 time = "*"
+regex = "1"
 
 [features]
 # no features by default

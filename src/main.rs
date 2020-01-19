@@ -21,14 +21,12 @@ fn main() -> Result<(), Error>{
     let bytes_ref = contents.as_bytes();
     let mut idx = USIZEWrapper::new(0);
     let idx_ref = idx.borrow_mut().trim_whitespace(bytes_ref);
+
     let obj = parse_json_entry(bytes_ref, idx_ref)?;
 
 
-
     dbg!(now.elapsed().as_seconds_f64());
-
-
-    mul_dbg!("=====================================\nParsing res: , {}", obj);
+    mul_dbg!("=====================================\nParsing res: {}", obj);
 
     Ok(())
 }
